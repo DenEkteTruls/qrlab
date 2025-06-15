@@ -91,8 +91,15 @@ const SelectValue: React.FC<SelectValueProps> = ({ placeholder }) => {
 const SelectContent: React.FC<SelectContentProps> = ({ children }) => {
   const { isOpen, setIsOpen } = React.useContext(SelectContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
+  const [isMounted, setIsMounted] = React.useState(false)
 
   React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  React.useEffect(() => {
+    if (!isMounted) return
+
     const handleClickOutside = (event: MouseEvent) => {
       if (contentRef.current && !contentRef.current.contains(event.target as Node)) {
         setIsOpen(false)
@@ -114,9 +121,9 @@ const SelectContent: React.FC<SelectContentProps> = ({ children }) => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen, setIsOpen])
+  }, [isOpen, setIsOpen, isMounted])
 
-  if (!isOpen) return null
+  if (!isOpen || !isMounted) return null
 
   return (
     <div

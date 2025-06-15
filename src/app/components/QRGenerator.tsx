@@ -15,6 +15,7 @@ import {
 } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
+import { toast } from "sonner";
 
 // Define types
 interface QRResult {
@@ -166,17 +167,17 @@ export default function QRGenerator() {
   const [qrResult, setQrResult] = useState<QRResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Initialize generator
+  // Initialize generator only once when component mounts
   useEffect(() => {
-    if (!generator) {
-      setGenerator(new QRCodeGenerator(qrStyle));
-    }
-  }, [generator, qrStyle]);
+    setIsMounted(true);
+    setGenerator(new QRCodeGenerator(qrStyle));
+  }, []); // Remove dependencies to prevent re-initialization
 
   // Memoized QR generation function
   const generateQR = useCallback(async () => {
-    if (!generator || !qrData.trim()) {
+    if (!generator || !qrData.trim() || !isMounted) {
       setQrResult(null);
       return;
     }
@@ -197,16 +198,16 @@ export default function QRGenerator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [generator, qrData, qrType, qrStyle]);
+  }, [generator, qrData, qrType, qrStyle, isMounted]);
 
-  // Generate QR code when any dependency changes (real-time updates)
+  // Only generate QR after component is mounted and has data
   useEffect(() => {
-    if (generator && qrData.trim()) {
+    if (isMounted && generator && qrData.trim()) {
       generateQR();
-    } else {
+    } else if (isMounted) {
       setQrResult(null);
     }
-  }, [generateQR, generator, qrData]);
+  }, [generateQR, generator, qrData, isMounted]);
 
   // Handle real-time style updates
   const handleStyleChange = useCallback((newStyle: Partial<QROptions>) => {
@@ -217,7 +218,9 @@ export default function QRGenerator() {
     if (!generator || !qrResult) return;
     
     try {
-      await generator.downloadQR(qrResult.url, `qrcode-${Date.now()}.png`);
+      // Generate filename on client side only to avoid hydration mismatch
+      const timestamp = typeof window !== 'undefined' ? Date.now() : 0;
+      await generator.downloadQR(qrResult.url, `qrcode-${timestamp}.png`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Download failed';
       setError(errorMessage);
@@ -357,6 +360,7 @@ export default function QRGenerator() {
                     style={{ fontFamily: 'Satoshi-Regular' }}
                   />
                 ) : (
+                  
                   <Input
                     id="qr-data"
                     type={qrType === "email" ? "email" : qrType === "phone" ? "tel" : "text"}
@@ -640,19 +644,29 @@ export default function QRGenerator() {
                 {/* Action Buttons */}
                 <div className="w-full space-y-3">
                   <Button 
-                    className="w-full text-sm py-3 h-auto shadow-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 transition-all duration-200 transform hover:scale-105" 
+                    className="w-full text-sm py-3 h-auto shadow-lg hover:cursor-pointer bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 transition-all duration-200 transform hover:scale-105" 
                     disabled={!qrResult || isGenerating}
                     onClick={handleDownload}
                     style={{ fontFamily: 'Satoshi-Bold' }}
                   >
                     <span className="mr-2">📥</span>
-                    Last ned QR-kode
+                    Lagre QR-kode
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="w-full text-sm py-3 h-auto border-2 hover:bg-slate-50 transition-all duration-200 transform hover:scale-105" 
+                    className="w-full text-sm py-3 h-auto border-2 hover:cursor-pointer hover:bg-slate-50 transition-all duration-200 transform hover:scale-105" 
                     disabled={!qrResult || isGenerating}
-                    onClick={handleCopy}
+                    onClick={() => {
+                        handleCopy();
+                        toast("Kopiert til utklippstavle 😊", {
+                          action: {
+                            label: "Lukk",
+                            onClick: () => {
+                              toast.dismiss();
+                            }
+                          }
+                        })
+                    }}
                     style={{ fontFamily: 'Satoshi-Medium' }}
                   >
                     <span className="mr-2">📋</span>
@@ -660,7 +674,7 @@ export default function QRGenerator() {
                   </Button>
                   <Button 
                     variant="ghost" 
-                    className="w-full text-sm py-3 h-auto hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 transform hover:scale-105" 
+                    className="w-full text-sm py-3 h-auto hover:cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 transform hover:scale-105" 
                     disabled={!qrResult || isGenerating}
                     style={{ fontFamily: 'Satoshi-Medium' }}
                   >

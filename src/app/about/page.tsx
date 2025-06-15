@@ -186,39 +186,13 @@ export default function About() {
               <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
                 <div className="w-20 h-20 bg-slate-200 rounded-full mx-auto mb-6"></div>
                 <h3 className="text-xl font-semibold mb-2 text-slate-900" style={{ fontFamily: 'Satoshi-Bold' }}>
-                  Erik Hansen
+                  Casper Nag
                 </h3>
                 <p className="text-slate-600 mb-3" style={{ fontFamily: 'Satoshi-Medium' }}>
                   Grunnlegger & CEO
                 </p>
                 <p className="text-sm text-slate-500" style={{ fontFamily: 'Satoshi-Regular' }}>
                   10+ års erfaring innen produktutvikling og teknologi
-                </p>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
-                <div className="w-20 h-20 bg-slate-200 rounded-full mx-auto mb-6"></div>
-                <h3 className="text-xl font-semibold mb-2 text-slate-900" style={{ fontFamily: 'Satoshi-Bold' }}>
-                  Maja Olsen
-                </h3>
-                <p className="text-slate-600 mb-3" style={{ fontFamily: 'Satoshi-Medium' }}>
-                  Lead Designer
-                </p>
-                <p className="text-sm text-slate-500" style={{ fontFamily: 'Satoshi-Regular' }}>
-                  Ekspert på brukeropplevelse og visuell design
-                </p>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
-                <div className="w-20 h-20 bg-slate-200 rounded-full mx-auto mb-6"></div>
-                <h3 className="text-xl font-semibold mb-2 text-slate-900" style={{ fontFamily: 'Satoshi-Bold' }}>
-                  Thomas Berg
-                </h3>
-                <p className="text-slate-600 mb-3" style={{ fontFamily: 'Satoshi-Medium' }}>
-                  Senior Utvikler
-                </p>
-                <p className="text-sm text-slate-500" style={{ fontFamily: 'Satoshi-Regular' }}>
-                  Fullstack utvikler med fokus på skalerbare løsninger
                 </p>
               </div>
             </div>
