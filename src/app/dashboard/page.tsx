@@ -158,7 +158,7 @@ function DashboardContent() {
     if (!authLoading && !user) {
       router.push('/login');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading]); // FIXED: Removed router from dependencies to prevent infinite loops
 
   if (authLoading || !user) {
     return (

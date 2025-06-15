@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, QRCode } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export function useQRCodes() {
   const [qrCodes, setQRCodes] = useState<QRCode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const { user } = useAuth();
-
-  const fetchQRCodes = async () => {
+  
+    const fetchQRCodes = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
     }
     
     try {
+      console.log('Fetching QR codes for user:', user.id);
+      
       const { data, error } = await supabase
         .from('qr_codes')
         .select('*')
@@ -21,25 +25,61 @@ export function useQRCodes() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase fetch error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
+        console.error('Supabase fetch error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
         throw error;
       }
       
+      console.log('Fetched QR codes:', data);
       setQRCodes(data || []);
     } catch (error: any) {
-      console.error('Error fetching QR codes:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('Error fetching QR codes:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error code:', error?.code);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
     } finally {
       setLoading(false);
+    }
+  }, [user]);
+
+  const ensureUserProfile = async () => {
+    if (!user) return false;
+
+    try {
+      // Check if user profile exists
+      const { data: profile, error: selectError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        console.error('Error checking profile:', selectError);
+        throw selectError;
+      }
+
+      if (!profile) {
+        console.log('Profile not found, creating one...');
+        // Create profile if it doesn't exist
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || user.email || 'User'
+          });
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          throw insertError;
+        }
+        console.log('Profile created successfully');
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error ensuring user profile:', error);
+      return false;
     }
   };
 
@@ -49,22 +89,34 @@ export function useQRCodes() {
     }
 
     try {
+      console.log('Starting QR code creation process...');
+      console.log('User ID:', user.id);
+      console.log('Input data:', qrCodeData);
+
+      // Ensure user profile exists first
+      const profileExists = await ensureUserProfile();
+      if (!profileExists) {
+        throw new Error('Failed to ensure user profile exists');
+      }
+
       // Generate a simple unique short ID
       const shortId = Math.random().toString(36).substr(2, 8);
+      console.log('Generated short ID:', shortId);
       
-      // Simplify the data structure to match the current schema
+      // Create a simplified data structure that matches the schema exactly
       const insertData = {
         user_id: user.id,
-        title: qrCodeData.title,
-        type: qrCodeData.type || 'url', // Default to 'url' if not specified
-        content: qrCodeData.content,
+        title: qrCodeData.title || 'Untitled QR Code',
+        type: qrCodeData.type || 'url',
+        content: qrCodeData.content || '',
         short_url: `qrlab.no/${shortId}`,
         design_settings: qrCodeData.design_settings || {},
+        advanced_settings: qrCodeData.advanced_settings || {},
         scan_count: 0,
         is_active: true
       };
 
-      console.log('Attempting to insert QR code:', insertData);
+      console.log('Final insert data:', JSON.stringify(insertData, null, 2));
 
       const { data, error } = await supabase
         .from('qr_codes')
@@ -73,34 +125,42 @@ export function useQRCodes() {
         .single();
 
       if (error) {
-        console.error('Supabase insert error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
+        console.error('Supabase insert error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        console.error('Error message:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Error hint:', error.hint);
+        console.error('Error details:', error.details);
+        throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
+      }
+
+      if (!data) {
+        throw new Error('No data returned from insert operation');
       }
 
       console.log('QR code created successfully:', data);
 
-      // Update local state
-      setQRCodes(prev => [data, ...prev]);
-      
+      // Update local state immediately
+      setQRCodes(current => [data, ...current]);
       return data;
     } catch (error: any) {
-      console.error('Error creating QR code:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      throw error;
+      console.error('Error in createQRCode function:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error.constructor.name);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+      console.error('Full error serialized:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      
+      // Re-throw with more specific error message
+      const errorMessage = error?.message || error?.error_description || 'Unknown database error';
+      throw new Error(`Failed to create QR code: ${errorMessage}`);
     }
   };
 
   const updateQRCode = async (id: string, updates: Partial<QRCode>) => {
     try {
+      console.log('Updating QR code:', id, updates);
+      
       const updateData = {
         ...updates,
         updated_at: new Date().toISOString()
@@ -114,54 +174,40 @@ export function useQRCodes() {
         .single();
 
       if (error) {
-        console.error('Supabase update error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
+        console.error('Supabase update error:', error);
+        throw new Error(`Update failed: ${error.message}`);
       }
       
-      setQRCodes(prev => prev.map(qr => qr.id === id ? data : qr));
+      // Update local state immediately
+      setQRCodes(current => 
+        current.map(qr => qr.id === id ? data : qr)
+      );
       return data;
     } catch (error: any) {
-      console.error('Error updating QR code:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      throw error;
+      console.error('Error updating QR code:', error);
+      throw new Error(`Failed to update QR code: ${error?.message || 'Unknown error'}`);
     }
   };
 
   const deleteQRCode = async (id: string) => {
     try {
+      console.log('Deleting QR code:', id);
+      
       const { error } = await supabase
         .from('qr_codes')
         .delete()
         .eq('id', id);
 
       if (error) {
-        console.error('Supabase delete error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
+        console.error('Supabase delete error:', error);
+        throw new Error(`Delete failed: ${error.message}`);
       }
       
-      setQRCodes(prev => prev.filter(qr => qr.id !== id));
+      // Update local state immediately
+      setQRCodes(current => current.filter(qr => qr.id !== id));
     } catch (error: any) {
-      console.error('Error deleting QR code:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      throw error;
+      console.error('Error deleting QR code:', error);
+      throw new Error(`Failed to delete QR code: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -184,17 +230,58 @@ export function useQRCodes() {
     }
   };
 
+  // Refetch function for manual refresh
+  const refetch = useCallback(async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    try {
+      console.log('Refetching QR codes for user:', user.id);
+      
+      const { data, error } = await supabase
+        .from('qr_codes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        throw error;
+      }
+      
+      console.log('Refetched QR codes:', data);
+      setQRCodes(data || []);
+    } catch (error: any) {
+      console.error('Error refetching QR codes:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  // FIXED: Use user directly in dependency instead of fetchQRCodes to break dependency chain
   useEffect(() => {
-    fetchQRCodes();
-  }, [user]);
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    
+    // Call refetch on initial load
+    refetch();
+  }, [user?.id, refetch]); // Only depend on user ID and refetch function
+
+  // REALTIME DISABLED: Causing refresh issues, using manual refresh instead
+  useEffect(() => {
+    setRealtimeConnected(false);
+  }, []);
 
   return {
     qrCodes,
     loading,
+    realtimeConnected,
     createQRCode,
     updateQRCode,
     deleteQRCode,
     getQRCodeById,
-    refetch: fetchQRCodes
+    refetch
   };
 } 

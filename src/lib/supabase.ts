@@ -24,6 +24,7 @@ export interface QRCode {
 export interface QRScan {
   id: string
   qr_code_id: string
+  scan_id: string
   ip_address: string
   user_agent: string
   country: string

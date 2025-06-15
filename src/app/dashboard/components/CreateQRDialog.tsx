@@ -217,10 +217,11 @@ class AdvancedQRCodeGenerator {
 interface CreateQRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingQR?: any; // QR code to edit, undefined for new QR
 }
 
-export function CreateQRDialog({ open, onOpenChange }: CreateQRDialogProps) {
-  const { createQRCode } = useQRCodes();
+export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialogProps) {
+  const { createQRCode, updateQRCode } = useQRCodes();
   
   // Form state
   const [title, setTitle] = useState("");
@@ -274,6 +275,54 @@ export function CreateQRDialog({ open, onOpenChange }: CreateQRDialogProps) {
     setGenerator(new AdvancedQRCodeGenerator(qrStyle));
   }, []);
 
+  // Load editing data when editingQR changes
+  useEffect(() => {
+    if (editingQR && open) {
+      setTitle(editingQR.title || "");
+      setQrType(editingQR.type || "url");
+      setQrData(editingQR.content || "");
+      
+      // Load design settings if available
+      const designSettings = editingQR.design_settings || {};
+      setQrStyle({
+        foregroundColor: designSettings.foregroundColor || "#000000",
+        backgroundColor: designSettings.backgroundColor || "#ffffff",
+        size: designSettings.size || 256,
+        errorCorrectionLevel: designSettings.errorCorrectionLevel || "M",
+        passwordProtected: designSettings.passwordProtected || false,
+        geoLocked: designSettings.geoLocked || false,
+        timeRestricted: designSettings.timeRestricted || false,
+        trackAnalytics: designSettings.trackAnalytics !== false,
+        requireUserAgent: designSettings.requireUserAgent || false,
+        blockSuspiciousActivity: designSettings.blockSuspiciousActivity !== false,
+        dynamicContent: designSettings.dynamicContent || false,
+        customRedirect: designSettings.customRedirect || false
+      });
+
+      // Load security settings
+      setSecuritySettings({
+        password: designSettings.password || "",
+        scanLimit: designSettings.scanLimit || 0,
+        maxScansPerDay: designSettings.maxScansPerDay || 0
+      });
+
+      // Load geo settings
+      setGeoSettings({
+        allowedCountries: designSettings.allowedCountries || [],
+        allowedCities: designSettings.allowedCities || [],
+        geoRadius: designSettings.geoRadius || 10,
+        geoCenter: designSettings.geoCenter || null
+      });
+
+      // Load time settings
+      setTimeSettings({
+        validFrom: designSettings.validFrom || "",
+        validUntil: designSettings.validUntil || "",
+        allowedTimeRanges: designSettings.allowedTimeRanges || []
+      });
+    }
+  }, [editingQR, open]);
+
   // Get user's current location for geo-lock
   useEffect(() => {
     if (navigator.geolocation && qrStyle.geoLocked) {
@@ -314,6 +363,7 @@ export function CreateQRDialog({ open, onOpenChange }: CreateQRDialogProps) {
     const combinedOptions = {
       ...qrStyle,
       ...geoSettings,
+      geoCenter: geoSettings.geoCenter || undefined,
       ...timeSettings,
       password: securitySettings.password,
       scanLimit: securitySettings.scanLimit || undefined,
@@ -409,14 +459,23 @@ export function CreateQRDialog({ open, onOpenChange }: CreateQRDialogProps) {
 
       console.log('Saving QR code with data:', qrCodeData);
 
-      const savedQRCode = await createQRCode(qrCodeData);
+      let savedQRCode;
+      if (editingQR) {
+        // Update existing QR code
+        savedQRCode = await updateQRCode(editingQR.id, qrCodeData);
+        toast.success(`QR-kode "${title.trim()}" oppdatert! 🎉`);
+      } else {
+        // Create new QR code
+        savedQRCode = await createQRCode(qrCodeData);
+        toast.success(`QR-kode "${title.trim()}" opprettet! 🎉`);
+      }
       
       console.log('QR Code saved successfully with ID:', savedQRCode.id);
-      toast.success(`QR-kode "${title.trim()}" opprettet! 🎉`);
       handleClose();
     } catch (error: any) {
       console.error('Error saving QR code:', error);
-      toast.error(`Kunne ikke lagre QR-koden: ${error.message || 'Ukjent feil'}`);
+      const action = editingQR ? 'oppdatere' : 'lagre';
+      toast.error(`Kunne ikke ${action} QR-koden: ${error.message || 'Ukjent feil'}`);
     } finally {
       setIsSaving(false);
     }
@@ -504,10 +563,13 @@ export function CreateQRDialog({ open, onOpenChange }: CreateQRDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" style={{ fontFamily: 'Satoshi-Bold, Satoshi-Variable' }}>
             <QrCode className="w-5 h-5" />
-            Avansert QR-kode generator
+            {editingQR ? 'Rediger QR-kode' : 'Avansert QR-kode generator'}
           </DialogTitle>
           <DialogDescription style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}>
-            Opprett profesjonelle QR-koder med geo-lås, tid-begrensninger og sikkerhetsfunksjoner
+            {editingQR 
+              ? 'Endre innstillinger og design for din QR-kode'
+              : 'Opprett profesjonelle QR-koder med geo-lås, tid-begrensninger og sikkerhetsfunksjoner'
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -1442,12 +1504,12 @@ export function CreateQRDialog({ open, onOpenChange }: CreateQRDialogProps) {
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Lagrer...
+                  {editingQR ? 'Oppdaterer...' : 'Lagrer...'}
                 </>
               ) : (
                 <>
                   <QrCode className="w-4 h-4 mr-2" />
-                  Opprett avansert QR-kode
+                  {editingQR ? 'Oppdater QR-kode' : 'Opprett avansert QR-kode'}
                 </>
               )}
             </Button>
