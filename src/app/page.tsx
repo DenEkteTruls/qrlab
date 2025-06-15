@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import '../../public/Fonts/WEB/css/satoshi.css';
 
 import Navbar from "./components/Navbar";

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Button } from './ui/button';
 
 export default function Navbar() {
@@ -5,30 +6,36 @@ export default function Navbar() {
         <nav className="relative z-10 flex justify-center py-6 px-6">
           <div className="flex items-center justify-between w-full max-w-6xl">
             <div className="text-2xl font-bold text-slate-900" style={{ fontFamily: 'Satoshi-Black' }}>
-              <a href="/">QRLab</a>
+              <Link 
+                href="/" 
+                className="text-2xl font-bold text-slate-900 hover:text-slate-700 transition-colors" 
+                style={{ fontFamily: 'Satoshi-Bold' }}
+              >
+                QRLab
+              </Link>
             </div>
             <div className="hidden md:flex items-center space-x-8 absolute left-1/2 transform -translate-x-1/2">
-              <a 
-                href="#" 
+              <Link 
+                href="#features" 
                 className="text-slate-600 hover:text-slate-900 transition-colors px-3 py-2 rounded-md hover:bg-slate-50" 
                 style={{ fontFamily: 'Satoshi-Medium' }}
               >
-                Hva er dette
-              </a>
-              <a 
-                href="#" 
+                Funksjoner
+              </Link>
+              <Link 
+                href="#pricing" 
                 className="text-slate-600 hover:text-slate-900 transition-colors px-3 py-2 rounded-md hover:bg-slate-50" 
                 style={{ fontFamily: 'Satoshi-Medium' }}
               >
-                Kundeservice
-              </a>
-              <a 
-                href="about" 
+                Priser
+              </Link>
+              <Link 
+                href="#about" 
                 className="text-slate-600 hover:text-slate-900 transition-colors px-3 py-2 rounded-md hover:bg-slate-50" 
                 style={{ fontFamily: 'Satoshi-Medium' }}
               >
-                Om Oss
-              </a>
+                Om oss
+              </Link>
             </div>
             <div className="flex items-center space-x-3">
               <Button 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -15,9 +16,29 @@ import {
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 
+// Define types
+interface QRResult {
+  url: string;
+  data: string;
+  type: string;
+  method: string;
+  options: QROptions;
+}
+
+interface QROptions {
+  size: number;
+  foregroundColor: string;
+  backgroundColor: string;
+  style: string;
+  errorCorrectionLevel: string;
+}
+
 // Create a client-side QRCodeGenerator class
 class QRCodeGenerator {
-  constructor(options = {}) {
+  public options: QROptions;
+  public apiEndpoints: { qrServer: string; quickChart: string };
+
+  constructor(options: Partial<QROptions> = {}) {
     this.options = {
       size: 256,
       foregroundColor: '#000000',
@@ -33,7 +54,7 @@ class QRCodeGenerator {
     };
   }
 
-  formatData(type, data) {
+  formatData(type: string, data: string): string {
     switch (type) {
       case 'url':
         return data.startsWith('http') ? data : `https://${data}`;
@@ -52,7 +73,7 @@ class QRCodeGenerator {
     }
   }
 
-  async generateWithAPI(data, method = 'qrServer') {
+  async generateWithAPI(data: string, method = 'qrServer'): Promise<string> {
     const encodedData = encodeURIComponent(data);
     
     switch (method) {
@@ -65,17 +86,17 @@ class QRCodeGenerator {
     }
   }
 
-  async generate(type, rawData, preferredMethod = 'api') {
+  async generate(type: string, rawData: string): Promise<QRResult> {
     const formattedData = this.formatData(type, rawData);
-    let qrUrl;
-    let method = 'api';
+    let qrUrl: string;
+    const method = 'api';
     
     try {
       qrUrl = await this.generateWithAPI(formattedData, 'qrServer');
-    } catch (error) {
+    } catch {
       try {
         qrUrl = await this.generateWithAPI(formattedData, 'quickChart');
-      } catch (fallbackError) {
+      } catch {
         throw new Error('All QR generation methods failed');
       }
     }
@@ -89,11 +110,11 @@ class QRCodeGenerator {
     };
   }
 
-  updateOptions(newOptions) {
+  updateOptions(newOptions: Partial<QROptions>): void {
     this.options = { ...this.options, ...newOptions };
   }
 
-  async downloadQR(qrUrl, filename = 'qrcode.png') {
+  async downloadQR(qrUrl: string, filename = 'qrcode.png'): Promise<void> {
     try {
       const response = await fetch(qrUrl);
       const blob = await response.blob();
@@ -111,7 +132,7 @@ class QRCodeGenerator {
     }
   }
 
-  async copyToClipboard(qrUrl) {
+  async copyToClipboard(qrUrl: string): Promise<void> {
     try {
       const response = await fetch(qrUrl);
       const blob = await response.blob();
@@ -133,7 +154,7 @@ class QRCodeGenerator {
 export default function QRGenerator() {
   const [qrType, setQrType] = useState("url");
   const [qrData, setQrData] = useState("");
-  const [qrStyle, setQrStyle] = useState({
+  const [qrStyle, setQrStyle] = useState<QROptions>({
     foregroundColor: "#000000",
     backgroundColor: "#ffffff",
     size: 256,
@@ -142,7 +163,7 @@ export default function QRGenerator() {
   });
   
   const [generator, setGenerator] = useState<QRCodeGenerator | null>(null);
-  const [qrResult, setQrResult] = useState<any>(null);
+  const [qrResult, setQrResult] = useState<QRResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,7 +172,7 @@ export default function QRGenerator() {
     if (!generator) {
       setGenerator(new QRCodeGenerator(qrStyle));
     }
-  }, [generator]);
+  }, [generator, qrStyle]);
 
   // Memoized QR generation function
   const generateQR = useCallback(async () => {
@@ -167,10 +188,11 @@ export default function QRGenerator() {
     setError(null);
     
     try {
-      const result = await generator.generate(qrType, qrData, 'api');
+      const result = await generator.generate(qrType, qrData);
       setQrResult(result);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
       setQrResult(null);
     } finally {
       setIsGenerating(false);
@@ -187,7 +209,7 @@ export default function QRGenerator() {
   }, [generateQR, generator, qrData]);
 
   // Handle real-time style updates
-  const handleStyleChange = useCallback((newStyle: Partial<typeof qrStyle>) => {
+  const handleStyleChange = useCallback((newStyle: Partial<QROptions>) => {
     setQrStyle(prev => ({ ...prev, ...newStyle }));
   }, []);
 
@@ -196,8 +218,9 @@ export default function QRGenerator() {
     
     try {
       await generator.downloadQR(qrResult.url, `qrcode-${Date.now()}.png`);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Download failed';
+      setError(errorMessage);
     }
   };
 
@@ -206,8 +229,9 @@ export default function QRGenerator() {
     
     try {
       await generator.copyToClipboard(qrResult.url);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Copy failed';
+      setError(errorMessage);
     }
   };
 
@@ -292,8 +316,8 @@ export default function QRGenerator() {
                   </SelectTrigger>
                   <SelectContent>
                     {qrTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value} className="text-base py-3">
-                        <div className="flex items-center gap-3">
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-3 text-base py-3">
                           <span className="text-lg">{type.icon}</span>
                           <span>{type.label}</span>
                         </div>
@@ -529,8 +553,8 @@ export default function QRGenerator() {
                   </SelectTrigger>
                   <SelectContent>
                     {errorCorrectionLevels.map((level) => (
-                      <SelectItem key={level.value} value={level.value} className="py-3">
-                        <div className="space-y-1">
+                      <SelectItem key={level.value} value={level.value}>
+                        <div className="space-y-1 py-3">
                           <div className="font-medium">{level.label}</div>
                           <div className="text-xs text-slate-500">{level.description}</div>
                         </div>
@@ -586,9 +610,11 @@ export default function QRGenerator() {
                     </div>
                   ) : qrResult ? (
                     <div className="relative group">
-                      <img 
+                      <Image 
                         src={qrResult.url} 
                         alt="Generated QR Code"
+                        width={220}
+                        height={220}
                         className="max-w-full max-h-full object-contain transition-all duration-300 group-hover:scale-105"
                         style={{ 
                           filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))'
