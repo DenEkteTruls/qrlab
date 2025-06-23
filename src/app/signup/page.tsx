@@ -102,22 +102,42 @@ export default function SignUp() {
 
               try {
                 const { supabase } = await import('@/lib/supabase');
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                   email,
                   password,
                   options: {
                     data: {
                       username: username,
-                      display_name: username
+                      display_name: username,
+                      full_name: username
                     }
                   }
                 });
                 
                 if (error) throw error;
+                
+                // Fallback: Ensure profile is created if trigger failed
+                if (data.user && !data.user.email_confirmed_at) {
+                  try {
+                    await supabase.rpc('create_user_profile', {
+                      user_id: data.user.id,
+                      user_email: email,
+                      user_name: username
+                    });
+                  } catch (profileError) {
+                    console.warn('Profile creation fallback failed:', profileError);
+                    // Don't throw here as the main signup succeeded
+                  }
+                }
+                
                 setSuccess('Bekreftelseslenke sendt til din e-post!');
               } catch (error: any) {
+                console.error('Signup error:', error);
                 setError(error.message === 'User already registered' ? 
-                  'E-posten er allerede registrert' : error.message);
+                  'E-posten er allerede registrert' : 
+                  error.message.includes('Database error') ? 
+                  'Det oppstod en databasefeil. Prøv igjen.' : 
+                  error.message);
               } finally {
                 setLoading(false);
               }

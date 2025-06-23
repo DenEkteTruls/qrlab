@@ -1,0 +1,187 @@
+{
+  "name": "qrlab",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "qrlab",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "id": "b57f63b8-7719-47e8-867e-3760e79aadc6",
+      "name": "Webhook",
+      "webhookId": "bd0a469e-6e6f-445e-b17b-bf4fd3f78786"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<html>\n  <body>\n    <script>\n      window.location.href = \"{{ $json.query.value }}\";\n    </script>\n    <p>If you are not redirected, <a href=\"{{ $json.query.value }}\">click here</a>.</p>\n  </body>\n</html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.3,
+      "position": [
+        280,
+        0
+      ],
+      "id": "2fa12628-e5dd-4237-990a-57bc585247d5",
+      "name": "Respond to Webhook",
+      "retryOnFail": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "tableId": "qr_scans",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $('Code').item.json.uuid }}"
+            },
+            {
+              "fieldId": "qr_code_id",
+              "fieldValue": "={{ $('Webhook').item.json.query.qr_id }}"
+            },
+            {
+              "fieldId": "ip_address",
+              "fieldValue": "={{ $('Webhook').item.json.headers['x-real-ip'] }}"
+            },
+            {
+              "fieldId": "user_agent",
+              "fieldValue": "={{ $('Webhook').item.json.headers['user-agent'] }}"
+            },
+            {
+              "fieldId": "scanned_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "country",
+              "fieldValue": "={{ $json.country_name }}"
+            },
+            {
+              "fieldId": "city",
+              "fieldValue": "={{ $json.city }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        600,
+        160
+      ],
+      "id": "c9a2e70e-f537-492f-9439-d9a73f15b10f",
+      "name": "Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "LHs88CM9GgcPbE6x",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function generateUuid() {\n    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n        const r = Math.random() * 16 | 0;\n        const v = c == 'x' ? r : (r & 0x3 | 0x8);\n        return v.toString(16);\n    });\n}\n\nreturn [{json: {uuid: generateUuid()}}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        160
+      ],
+      "id": "a34af8a1-df5d-40e0-9feb-3e3147ece55b",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "url": "=https://ipapi.co/{{ $('Webhook').item.json.headers['x-real-ip'] }}/json/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        160
+      ],
+      "id": "4fb10e9e-d0a8-4237-a2ee-d165c6453079",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [],
+        []
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "any",
+    "errorWorkflow": "QQUMGkuviGjyCIut"
+  },
+  "versionId": "37347bf2-516f-42fe-a4fa-e18f42e5f69d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e1594d91fc10b8bc2b03270ba075eb6cd7659c9f4e1b420fe44ff03cfdc2f999"
+  },
+  "id": "QQUMGkuviGjyCIut",
+  "tags": []
+}

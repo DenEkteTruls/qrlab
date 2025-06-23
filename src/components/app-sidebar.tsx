@@ -26,7 +26,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { useDashboard, type DashboardSection } from "@/app/dashboard/page"
+import { useDashboard, type DashboardSection } from "@/hooks/useDashboard"
 
 // QR Dashboard navigation data
 const data = {

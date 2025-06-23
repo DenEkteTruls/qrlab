@@ -45,32 +45,14 @@ import { User, Settings, LogOut, CreditCard } from "lucide-react";
 import AuthWrapper from '@/components/AuthWrapper';
 
 // Import section components
-import { DashboardSection } from './components/DashboardSection';
+import { DashboardSection as DashboardSectionComponent } from './components/DashboardSection';
 import { QRCodesSection } from './components/QRCodesSection';
 import { AnalyticsSection } from './components/AnalyticsSection';
 import { BulkUploadSection, TeamSection, SettingsSection } from './components/OtherSections';
 import { CreateQRDialog } from './components/CreateQRDialog';
 
-// Define the available sections
-export type DashboardSection = 'dashboard' | 'qr-codes' | 'bulk-upload' | 'analytics' | 'team' | 'settings';
-
-// Create a context for section management
-import { createContext, useContext } from 'react';
-
-interface DashboardContextType {
-  activeSection: DashboardSection;
-  setActiveSection: (section: DashboardSection) => void;
-}
-
-const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
-
-export const useDashboard = () => {
-  const context = useContext(DashboardContext);
-  if (!context) {
-    throw new Error('useDashboard must be used within DashboardProvider');
-  }
-  return context;
-};
+// Import dashboard types and hooks
+import { DashboardSection, DashboardContext, useDashboard } from '@/hooks/useDashboard';
 
 function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [activeSection, setActiveSection] = useState<DashboardSection>('dashboard');
@@ -263,7 +245,7 @@ function DashboardContent() {
   const renderSectionContent = () => {
     switch (activeSection) {
       case 'dashboard':
-        return <DashboardSection />;
+        return <DashboardSectionComponent />;
       case 'qr-codes':
         return <QRCodesSection />;
       case 'analytics':
@@ -275,7 +257,7 @@ function DashboardContent() {
       case 'settings':
         return <SettingsSection />;
       default:
-        return <DashboardSection />;
+        return <DashboardSectionComponent />;
     }
   };
 

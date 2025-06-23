@@ -262,6 +262,19 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     maxScansPerDay: 0
   });
 
+  // WiFi specific settings
+  const [wifiSettings, setWifiSettings] = useState({
+    ssid: "",
+    password: "",
+    security: "WPA2"
+  });
+
+  // Text specific settings
+  const [textSettings, setTextSettings] = useState({
+    title: "",
+    content: ""
+  });
+
   // Generator state
   const [generator, setGenerator] = useState<AdvancedQRCodeGenerator | null>(null);
   const [qrResult, setQrResult] = useState<QRResult | null>(null);
@@ -320,6 +333,37 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
         validUntil: designSettings.validUntil || "",
         allowedTimeRanges: designSettings.allowedTimeRanges || []
       });
+
+      // Load WiFi settings if it's a WiFi QR code
+      if (editingQR.type === "wifi" && editingQR.content) {
+        // Parse existing WiFi data: WIFI:T:WPA2;S:MyNetwork;P:password;;
+        const wifiMatch = editingQR.content.match(/WIFI:T:([^;]*);S:([^;]*);P:([^;]*);/);
+        if (wifiMatch) {
+          setWifiSettings({
+            security: wifiMatch[1] || "WPA2",
+            ssid: wifiMatch[2] || "",
+            password: wifiMatch[3] || ""
+          });
+        }
+      }
+
+      // Load Text settings if it's a Text QR code
+      if (editingQR.type === "text" && editingQR.content) {
+        // Parse existing text data: title###content
+        const parts = editingQR.content.split('###');
+        if (parts.length >= 2) {
+          setTextSettings({
+            title: parts[0] || "",
+            content: parts[1] || ""
+          });
+        } else {
+          // If no separator found, treat as content only
+          setTextSettings({
+            title: "",
+            content: editingQR.content
+          });
+        }
+      }
     }
   }, [editingQR, open]);
 
@@ -355,7 +399,19 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
 
   // Generate QR code when data changes
   const generateQR = useCallback(async () => {
-    if (!generator || !qrData.trim()) {
+    let dataToUse = qrData.trim();
+    
+    // For WiFi, construct data from separate fields
+    if (qrType === "wifi" && wifiSettings.ssid) {
+      dataToUse = `${wifiSettings.ssid}:${wifiSettings.password}:${wifiSettings.security}`;
+    }
+    
+    // For Text, construct data from separate fields
+    if (qrType === "text" && (textSettings.title || textSettings.content)) {
+      dataToUse = `${textSettings.title}###${textSettings.content}`;
+    }
+    
+    if (!generator || !dataToUse) {
       setQrResult(null);
       return;
     }
@@ -375,7 +431,7 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     setError(null);
     
     try {
-      const result = await generator.generate(qrType, qrData);
+      const result = await generator.generate(qrType, dataToUse);
       setQrResult(result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -384,15 +440,24 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     } finally {
       setIsGenerating(false);
     }
-  }, [generator, qrData, qrType, qrStyle, geoSettings, timeSettings, securitySettings]);
+  }, [generator, qrData, qrType, qrStyle, geoSettings, timeSettings, securitySettings, wifiSettings, textSettings]);
 
   useEffect(() => {
-    if (generator && qrData.trim()) {
+    let hasData = false;
+    if (qrType === "wifi") {
+      hasData = wifiSettings.ssid.trim() !== "";
+    } else if (qrType === "text") {
+      hasData = textSettings.title.trim() !== "" || textSettings.content.trim() !== "";
+    } else {
+      hasData = qrData.trim() !== "";
+    }
+    
+    if (generator && hasData) {
       generateQR();
     } else {
       setQrResult(null);
     }
-  }, [generateQR, generator, qrData]);
+  }, [generateQR, generator, qrData, qrType, wifiSettings, textSettings]);
 
   // Handle style changes
   const handleStyleChange = useCallback((newStyle: Partial<AdvancedQROptions>) => {
@@ -515,6 +580,15 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
       password: "",
       scanLimit: 0,
       maxScansPerDay: 0
+    });
+    setWifiSettings({
+      ssid: "",
+      password: "",
+      security: "WPA2"
+    });
+    setTextSettings({
+      title: "",
+      content: ""
     });
     setQrResult(null);
     setError(null);
@@ -642,13 +716,36 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
                         <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
                           Innhold *
                         </Label>
-                        {qrType === "text" || qrType === "sms" ? (
+                        {qrType === "text" ? (
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Tittel
+                              </Label>
+                              <Input
+                                placeholder="Skriv inn tittel..."
+                                value={textSettings.title}
+                                onChange={(e) => setTextSettings(prev => ({ ...prev, title: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Tekst *
+                              </Label>
+                              <Textarea
+                                placeholder="Skriv inn teksten din her..."
+                                value={textSettings.content}
+                                onChange={(e) => setTextSettings(prev => ({ ...prev, content: e.target.value }))}
+                                className="min-h-[80px]"
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                          </div>
+                        ) : qrType === "sms" ? (
                           <Textarea
-                            placeholder={
-                              qrType === "text" 
-                                ? "Skriv inn teksten din her..." 
-                                : "Skriv inn SMS meldingen..."
-                            }
+                            placeholder="Skriv inn SMS meldingen..."
                             value={qrData}
                             onChange={(e) => setQrData(e.target.value)}
                             className="min-h-[80px]"
@@ -677,6 +774,54 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
                             onChange={(e) => setQrData(e.target.value)}
                             style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
                           />
+                        ) : qrType === "wifi" ? (
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                SSID (Nettverksnavn) *
+                              </Label>
+                              <Input
+                                placeholder="Mitt WiFi-nettverk"
+                                value={wifiSettings.ssid}
+                                onChange={(e) => setWifiSettings(prev => ({ ...prev, ssid: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Passord
+                              </Label>
+                              <Input
+                                type="password"
+                                placeholder="WiFi-passord"
+                                value={wifiSettings.password}
+                                onChange={(e) => setWifiSettings(prev => ({ ...prev, password: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Sikkerhet
+                              </Label>
+                              <Select 
+                                value={wifiSettings.security} 
+                                onValueChange={(value) => setWifiSettings(prev => ({ ...prev, security: value }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="WPA">WPA</SelectItem>
+                                  <SelectItem value="WPA2">WPA2</SelectItem>
+                                  <SelectItem value="WPA3">WPA3</SelectItem>
+                                  <SelectItem value="WEP">WEP (ikke anbefalt)</SelectItem>
+                                  <SelectItem value="nopass">Åpent nettverk</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
                         ) : (
                           <Input
                             type={qrType === "email" ? "email" : qrType === "phone" ? "tel" : "text"}
@@ -684,7 +829,6 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
                               qrType === "url" ? "https://example.com" :
                               qrType === "email" ? "navn@example.com" :
                               qrType === "phone" ? "+47 123 45 678" :
-                              qrType === "wifi" ? "SSID:passord:WPA" :
                               "Skriv inn data..."
                             }
                             value={qrData}

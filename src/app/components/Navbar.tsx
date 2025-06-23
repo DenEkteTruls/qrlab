@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { CurrentUserAvatar } from "./current-user-avatar";
+import { User } from '@supabase/supabase-js';
 
 export default function Navbar() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
