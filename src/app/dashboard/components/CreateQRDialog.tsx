@@ -142,8 +142,6 @@ class AdvancedQRCodeGenerator {
         return this.formatVCard(data);
       case 'event':
         return this.formatEvent(data);
-      case 'crypto':
-        return this.formatCrypto(data);
       case 'text':
       default:
         return data;
@@ -160,10 +158,7 @@ class AdvancedQRCodeGenerator {
     return `BEGIN:VEVENT\nSUMMARY:${title}\nDTSTART:${date}\nLOCATION:${location}\nDESCRIPTION:${description}\nEND:VEVENT`;
   }
 
-  private formatCrypto(data: string): string {
-    const [currency, address, amount] = data.split(':');
-    return `${currency}:${address}${amount ? `?amount=${amount}` : ''}`;
-  }
+
 
   async generateWithAPI(data: string, method = 'qrServer'): Promise<string> {
     const encodedData = encodeURIComponent(data);
@@ -275,6 +270,14 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     content: ""
   });
 
+  // vCard specific settings
+  const [vcardSettings, setVcardSettings] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    company: ""
+  });
+
   // Generator state
   const [generator, setGenerator] = useState<AdvancedQRCodeGenerator | null>(null);
   const [qrResult, setQrResult] = useState<QRResult | null>(null);
@@ -364,6 +367,22 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
           });
         }
       }
+
+      // Load vCard settings if it's a vCard QR code
+      if (editingQR.type === "vcard" && editingQR.content) {
+        // Parse existing vCard data: BEGIN:VCARD\nVERSION:3.0\nFN:name\nTEL:phone\nEMAIL:email\nORG:company\nEND:VCARD
+        const vcardMatch = editingQR.content.match(/FN:([^\n]*)/);
+        const phoneMatch = editingQR.content.match(/TEL:([^\n]*)/);
+        const emailMatch = editingQR.content.match(/EMAIL:([^\n]*)/);
+        const orgMatch = editingQR.content.match(/ORG:([^\n]*)/);
+        
+        setVcardSettings({
+          name: vcardMatch ? vcardMatch[1] : "",
+          phone: phoneMatch ? phoneMatch[1] : "",
+          email: emailMatch ? emailMatch[1] : "",
+          company: orgMatch ? orgMatch[1] : ""
+        });
+      }
     }
   }, [editingQR, open]);
 
@@ -411,6 +430,11 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
       dataToUse = `${textSettings.title}###${textSettings.content}`;
     }
     
+    // For vCard, construct data from separate fields
+    if (qrType === "vcard" && vcardSettings.name && (vcardSettings.phone || vcardSettings.email)) {
+      dataToUse = `${vcardSettings.name}:${vcardSettings.phone}:${vcardSettings.email}:${vcardSettings.company}`;
+    }
+    
     if (!generator || !dataToUse) {
       setQrResult(null);
       return;
@@ -448,6 +472,8 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
       hasData = wifiSettings.ssid.trim() !== "";
     } else if (qrType === "text") {
       hasData = textSettings.title.trim() !== "" || textSettings.content.trim() !== "";
+    } else if (qrType === "vcard") {
+      hasData = vcardSettings.name.trim() !== "" && (vcardSettings.phone.trim() !== "" || vcardSettings.email.trim() !== "");
     } else {
       hasData = qrData.trim() !== "";
     }
@@ -457,7 +483,7 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     } else {
       setQrResult(null);
     }
-  }, [generateQR, generator, qrData, qrType, wifiSettings, textSettings]);
+  }, [generateQR, generator, qrData, qrType, wifiSettings, textSettings, vcardSettings]);
 
   // Handle style changes
   const handleStyleChange = useCallback((newStyle: Partial<AdvancedQROptions>) => {
@@ -474,13 +500,13 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     setIsSaving(true);
     try {
       // Make sure the QR type is valid
-      const validTypes = ['url', 'text', 'vcard', 'wifi', 'email', 'phone', 'sms', 'event', 'crypto'];
+      const validTypes = ['url', 'text', 'vcard', 'wifi', 'email', 'phone', 'sms', 'event'];
       const finalType = validTypes.includes(qrType) ? qrType : 'url';
 
       // Structure the data more simply to avoid schema issues
       const qrCodeData = {
         title: title.trim(),
-        type: finalType as 'url' | 'text' | 'vcard' | 'wifi' | 'email' | 'phone' | 'sms' | 'event' | 'crypto',
+        type: finalType as 'url' | 'text' | 'vcard' | 'wifi' | 'email' | 'phone' | 'sms' | 'event',
         content: qrResult.data,
         design_settings: {
           // Basic visual settings
@@ -590,6 +616,12 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
       title: "",
       content: ""
     });
+    setVcardSettings({
+      name: "",
+      phone: "",
+      email: "",
+      company: ""
+    });
     setQrResult(null);
     setError(null);
     onOpenChange(false);
@@ -604,7 +636,6 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     { value: "wifi", label: "Wi-Fi", icon: "📶", description: "Wi-Fi tilkobling" },
     { value: "vcard", label: "Visittkort", icon: "👤", description: "Kontaktinformasjon" },
     { value: "event", label: "Arrangement", icon: "📅", description: "Kalender hendelse" },
-    { value: "crypto", label: "Kryptovaluta", icon: "₿", description: "Crypto wallet adresse" },
   ];
 
   const colorPresets = [
@@ -752,26 +783,72 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
                             style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
                           />
                         ) : qrType === "vcard" ? (
-                          <Textarea
-                            placeholder="Navn:Telefon:E-post:Organisasjon"
-                            value={qrData}
-                            onChange={(e) => setQrData(e.target.value)}
-                            className="min-h-[80px]"
-                            style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
-                          />
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Navn *
+                              </Label>
+                              <Input
+                                placeholder="Ola Nordmann"
+                                value={vcardSettings.name}
+                                onChange={(e) => setVcardSettings(prev => ({ ...prev, name: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Telefon
+                              </Label>
+                              <Input
+                                type="tel"
+                                placeholder="+47 123 45 678"
+                                value={vcardSettings.phone}
+                                onChange={(e) => setVcardSettings(prev => ({ ...prev, phone: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                E-post
+                              </Label>
+                              <Input
+                                type="email"
+                                placeholder="ola@example.com"
+                                value={vcardSettings.email}
+                                onChange={(e) => setVcardSettings(prev => ({ ...prev, email: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label style={{ fontFamily: 'Satoshi-Medium, Satoshi-Variable' }}>
+                                Firma
+                              </Label>
+                              <Input
+                                placeholder="Min Bedrift AS"
+                                value={vcardSettings.company}
+                                onChange={(e) => setVcardSettings(prev => ({ ...prev, company: e.target.value }))}
+                                style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
+                              />
+                            </div>
+                            
+                            {vcardSettings.name && !vcardSettings.phone && !vcardSettings.email && (
+                              <div className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-800">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-amber-600">⚠️</span>
+                                  Telefon eller e-post må fylles ut
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         ) : qrType === "event" ? (
                           <Textarea
                             placeholder="Tittel:YYYYMMDDTHHMMSS:Lokasjon:Beskrivelse"
                             value={qrData}
                             onChange={(e) => setQrData(e.target.value)}
                             className="min-h-[80px]"
-                            style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
-                          />
-                        ) : qrType === "crypto" ? (
-                          <Input
-                            placeholder="bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa:0.001"
-                            value={qrData}
-                            onChange={(e) => setQrData(e.target.value)}
                             style={{ fontFamily: 'Satoshi-Regular, Satoshi-Variable' }}
                           />
                         ) : qrType === "wifi" ? (

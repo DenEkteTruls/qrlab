@@ -1,7 +1,7 @@
 // QR Code Tracking Utilities
 
 // For testing: use local API endpoint
-const TRACKING_BASE_URL = 'http://192.168.10.195:5678/webhook-test/qrlab';
+const TRACKING_BASE_URL = 'http://feasible-troll-epic.ngrok-free.app/webhook/qrlab';
 
 // For production: use external webhook
 // const TRACKING_BASE_URL = 'http://caspernag.app.n8n.cloud/webhook-test/qrlab';
