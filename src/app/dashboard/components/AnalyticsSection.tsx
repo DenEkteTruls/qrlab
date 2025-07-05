@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQRCodes } from '@/hooks/useQRCodes';
 import { useQRScans } from '@/hooks/useQRScans';
 import { 
@@ -12,13 +12,11 @@ import {
   Download,
   Search,
   QrCode,
-  MapPin,
   Smartphone,
   Monitor,
   Tablet,
   Globe,
   Clock,
-  Filter,
   Activity,
   Users,
   Target,
@@ -36,7 +34,6 @@ import {
   SelectValue,
   SelectSeparator
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { QRCode } from '@/lib/supabase';
 // Note: Install recharts for production charts: npm install recharts
@@ -159,7 +156,7 @@ export function AnalyticsSection() {
   }, [qrScans]);
 
   // Generate real time-based data from QR creation and scan patterns
-  const generateTimeSeriesData = (qr?: QRCode) => {
+  const generateTimeSeriesData = useCallback((qr?: QRCode) => {
     // Convert timeRange to days
     const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : timeRange === '1y' ? 365 : 30;
     const data = [];
@@ -252,10 +249,10 @@ export function AnalyticsSection() {
     }
     
     return data;
-  };
+  }, [timeRange, qrCodes]);
 
-  const timeSeriesData = useMemo(() => generateTimeSeriesData(), [qrCodes, timeRange]);
-  const selectedTimeSeriesData = useMemo(() => selectedQR ? generateTimeSeriesData(selectedQR) : [], [selectedQR, timeRange]);
+  const timeSeriesData = useMemo(() => generateTimeSeriesData(), [generateTimeSeriesData]);
+  const selectedTimeSeriesData = useMemo(() => selectedQR ? generateTimeSeriesData(selectedQR) : [], [selectedQR, generateTimeSeriesData]);
 
   // Calculate real location data from actual QR scan data
   const locationData = useMemo(() => {
@@ -339,7 +336,7 @@ export function AnalyticsSection() {
     }
 
     // Use actual scan data from Supabase (max 5 most recent)
-    return qrScans.slice(0, 3).map((scan: any) => {
+    return qrScans.slice(0, 3).map((scan: { qr_code_id: string; scanned_at: string; country?: string; city?: string; user_agent?: string }) => {
       const qrCode = qrCodes.find(qr => qr.id === scan.qr_code_id);
       const scannedAt = new Date(scan.scanned_at);
       const now = new Date();
@@ -375,7 +372,7 @@ export function AnalyticsSection() {
         'unknown': '🌍'
       };
 
-      const flag = countryFlags[scan.country] || '🌍';
+      const flag = countryFlags[scan.country || 'unknown'] || '🌍';
       const location = scan.city && scan.city !== 'unknown' 
         ? `${flag} ${scan.city}` 
         : `${flag} ${scan.country || 'Ukjent'}`;
@@ -392,7 +389,7 @@ export function AnalyticsSection() {
   }, [qrScans, qrCodes]);
 
   // Custom Chart Component (replace with recharts in production)
-  const SimpleLineChart = ({ data, color = '#3b82f6', height = 200 }: { data: any[], color?: string, height?: number }) => {
+  const SimpleLineChart = ({ data, color = '#3b82f6', height = 200 }: { data: { date: string; scans: number }[], color?: string, height?: number }) => {
     if (!data.length) return <div className="h-48 flex items-center justify-center text-muted-foreground">Ingen data</div>;
     
     const maxValue = Math.max(...data.map(d => d.scans));
@@ -625,7 +622,7 @@ export function AnalyticsSection() {
                     
                     {filteredQRCodes.length === 0 && searchTerm && (
                       <div className="p-3 text-center text-sm text-muted-foreground">
-                        Ingen QR-koder funnet for "{searchTerm}"
+                        Ingen QR-koder funnet for &quot;{searchTerm}&quot;
                       </div>
                     )}
                   </div>
@@ -1652,7 +1649,12 @@ export function AnalyticsSection() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {(() => {
-                        const advancedSettings = selectedQR.advanced_settings || {};
+                        const advancedSettings = selectedQR.advanced_settings as { 
+                          passwordProtected?: boolean; 
+                          scanLimit?: number; 
+                          geoLocked?: boolean; 
+                          timeRestricted?: boolean; 
+                        } || {};
                         const hasAdvancedFeatures = Object.keys(advancedSettings).length > 0;
 
                         if (!hasAdvancedFeatures) {
@@ -1911,7 +1913,7 @@ export function AnalyticsSection() {
                                ipCounts[scan.ip_address] = (ipCounts[scan.ip_address] || 0) + 1;
                              }
                            });
-                           const suspiciousIPs = Object.entries(ipCounts).filter(([ip, count]) => count > 10).length;
+                           const suspiciousIPs = Object.entries(ipCounts).filter(([, count]) => count > 10).length;
                            if (suspiciousIPs > 0) {
                              securityInsights.push({
                                type: 'warning',

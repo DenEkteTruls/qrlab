@@ -212,7 +212,7 @@ class AdvancedQRCodeGenerator {
 interface CreateQRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingQR?: any; // QR code to edit, undefined for new QR
+  editingQR?: { id: string; title: string; type: string; content: string; design_settings?: Record<string, unknown> }; // QR code to edit, undefined for new QR
 }
 
 export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialogProps) {
@@ -289,7 +289,7 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
   // Initialize generator
   useEffect(() => {
     setGenerator(new AdvancedQRCodeGenerator(qrStyle));
-  }, []);
+  }, [qrStyle]);
 
   // Load editing data when editingQR changes
   useEffect(() => {
@@ -301,40 +301,43 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
       // Load design settings if available
       const designSettings = editingQR.design_settings || {};
       setQrStyle({
-        foregroundColor: designSettings.foregroundColor || "#000000",
-        backgroundColor: designSettings.backgroundColor || "#ffffff",
-        size: designSettings.size || 256,
-        errorCorrectionLevel: designSettings.errorCorrectionLevel || "M",
-        passwordProtected: designSettings.passwordProtected || false,
-        geoLocked: designSettings.geoLocked || false,
-        timeRestricted: designSettings.timeRestricted || false,
-        trackAnalytics: designSettings.trackAnalytics !== false,
-        requireUserAgent: designSettings.requireUserAgent || false,
-        blockSuspiciousActivity: designSettings.blockSuspiciousActivity !== false,
-        dynamicContent: designSettings.dynamicContent || false,
-        customRedirect: designSettings.customRedirect || false
+        foregroundColor: typeof designSettings.foregroundColor === 'string' ? designSettings.foregroundColor : "#000000",
+        backgroundColor: typeof designSettings.backgroundColor === 'string' ? designSettings.backgroundColor : "#ffffff",
+        size: typeof designSettings.size === 'number' ? designSettings.size : 256,
+        errorCorrectionLevel: typeof designSettings.errorCorrectionLevel === 'string' ? designSettings.errorCorrectionLevel : "M",
+        passwordProtected: typeof designSettings.passwordProtected === 'boolean' ? designSettings.passwordProtected : false,
+        geoLocked: typeof designSettings.geoLocked === 'boolean' ? designSettings.geoLocked : false,
+        timeRestricted: typeof designSettings.timeRestricted === 'boolean' ? designSettings.timeRestricted : false,
+        trackAnalytics: typeof designSettings.trackAnalytics === 'boolean' ? designSettings.trackAnalytics : true,
+        requireUserAgent: typeof designSettings.requireUserAgent === 'boolean' ? designSettings.requireUserAgent : false,
+        blockSuspiciousActivity: typeof designSettings.blockSuspiciousActivity === 'boolean' ? designSettings.blockSuspiciousActivity : true,
+        dynamicContent: typeof designSettings.dynamicContent === 'boolean' ? designSettings.dynamicContent : false,
+        customRedirect: typeof designSettings.customRedirect === 'boolean' ? designSettings.customRedirect : false
       });
 
       // Load security settings
       setSecuritySettings({
-        password: designSettings.password || "",
-        scanLimit: designSettings.scanLimit || 0,
-        maxScansPerDay: designSettings.maxScansPerDay || 0
+        password: typeof designSettings.password === 'string' ? designSettings.password : "",
+        scanLimit: typeof designSettings.scanLimit === 'number' ? designSettings.scanLimit : 0,
+        maxScansPerDay: typeof designSettings.maxScansPerDay === 'number' ? designSettings.maxScansPerDay : 0
       });
 
       // Load geo settings
       setGeoSettings({
-        allowedCountries: designSettings.allowedCountries || [],
-        allowedCities: designSettings.allowedCities || [],
-        geoRadius: designSettings.geoRadius || 10,
-        geoCenter: designSettings.geoCenter || null
+        allowedCountries: Array.isArray(designSettings.allowedCountries) ? designSettings.allowedCountries : [],
+        allowedCities: Array.isArray(designSettings.allowedCities) ? designSettings.allowedCities : [],
+        geoRadius: typeof designSettings.geoRadius === 'number' ? designSettings.geoRadius : 10,
+        geoCenter: designSettings.geoCenter && typeof designSettings.geoCenter === 'object' && 
+                   typeof (designSettings.geoCenter as { lat: number; lng: number }).lat === 'number' && 
+                   typeof (designSettings.geoCenter as { lat: number; lng: number }).lng === 'number' 
+                   ? designSettings.geoCenter as { lat: number; lng: number } : null
       });
 
       // Load time settings
       setTimeSettings({
-        validFrom: designSettings.validFrom || "",
-        validUntil: designSettings.validUntil || "",
-        allowedTimeRanges: designSettings.allowedTimeRanges || []
+        validFrom: typeof designSettings.validFrom === 'string' ? designSettings.validFrom : "",
+        validUntil: typeof designSettings.validUntil === 'string' ? designSettings.validUntil : "",
+        allowedTimeRanges: Array.isArray(designSettings.allowedTimeRanges) ? designSettings.allowedTimeRanges : []
       });
 
       // Load WiFi settings if it's a WiFi QR code
@@ -464,7 +467,7 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
     } finally {
       setIsGenerating(false);
     }
-  }, [generator, qrData, qrType, qrStyle, geoSettings, timeSettings, securitySettings, wifiSettings, textSettings]);
+  }, [generator, qrData, qrType, qrStyle, geoSettings, timeSettings, securitySettings, wifiSettings, textSettings, vcardSettings]);
 
   useEffect(() => {
     let hasData = false;
@@ -563,10 +566,11 @@ export function CreateQRDialog({ open, onOpenChange, editingQR }: CreateQRDialog
       
       console.log('QR Code saved successfully with ID:', savedQRCode.id);
       handleClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving QR code:', error);
       const action = editingQR ? 'oppdatere' : 'lagre';
-      toast.error(`Kunne ikke ${action} QR-koden: ${error.message || 'Ukjent feil'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Ukjent feil';
+      toast.error(`Kunne ikke ${action} QR-koden: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }

@@ -40,7 +40,7 @@ export function getTrackableContent(qrCode: {
   id: string;
   type: string;
   content: string;
-  design_settings?: any;
+  design_settings?: Record<string, unknown>;
 }): string {
   // Check if tracking is enabled (default to true)
   const trackingEnabled = qrCode.design_settings?.trackAnalytics !== false;
