@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabase';
 
 export default function TestTrackingPage() {
@@ -105,7 +103,7 @@ export default function TestTrackingPage() {
     
     try {
       // Try to get table info by attempting to select with scan_id
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('qr_scans')
         .select('scan_id')
         .limit(1);

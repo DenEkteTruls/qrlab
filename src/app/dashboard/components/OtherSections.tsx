@@ -116,18 +116,6 @@ export function SettingsSection() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // Load user profile on component mount
-  useEffect(() => {
-    if (user) {
-      setProfile({
-        full_name: user.user_metadata?.full_name || '',
-        email: user.email || '',
-        avatar_url: user.user_metadata?.avatar_url || ''
-      });
-      loadNotificationSettings();
-    }
-  }, [user]);
-
   const loadNotificationSettings = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -143,6 +131,18 @@ export function SettingsSection() {
       console.error('Error loading notification settings:', error);
     }
   }, [user?.id]);
+
+  // Load user profile on component mount
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        full_name: user.user_metadata?.full_name || '',
+        email: user.email || '',
+        avatar_url: user.user_metadata?.avatar_url || ''
+      });
+      loadNotificationSettings();
+    }
+  }, [user, loadNotificationSettings]);
 
   const handleProfileUpdate = async () => {
     if (!user) return;
